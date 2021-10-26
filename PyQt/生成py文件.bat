@@ -1,0 +1,1 @@
+pyuic5 -o cala.py cala.ui
