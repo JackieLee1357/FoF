@@ -10,36 +10,34 @@
 # @Time: 8月 21, 2021
 # ---
 
+from __future__ import print_function
 import base64
 import configparser
-import datetime
-import os
 import smtplib
-import sys
-import time
 import traceback
+from builtins import range
 from email.header import Header
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from importlib import reload
-import matplotlib
-import matplotlib as mpl
+import airflow
 import pandas
-import numpy as np
 import pandas as pd
 import pymssql
 import sqlalchemy
 import sqlalchemy.sql.default_comparator
-from pylab import *
+from airflow.models import DAG
+from airflow.operators.python_operator import PythonOperator
 from matplotlib import pyplot as plt, ticker
+from pylab import *
 
 stdi, stdo, stde = sys.stdin, sys.stdout, sys.stderr
 reload(sys)  # 通过import引用进来时,setdefaultencoding函数在被系统调用后被删除了，所以必须reload一次
 sys.stdin, sys.stdout, sys.stderr = stdi, stdo, stde
 
 
-def readDataSource(pathName):
+def readDataSource(pathName, dateDays, dateNow, project):
     # 读取数据源excel，进行数据处理，并返回DataFrame
     sheetKeys = pandas.read_excel(pathName, sheet_name=None)  # 读取excel
     pandas.set_option('display.max_columns', None)  # 显示所有列
@@ -67,13 +65,13 @@ def readDataSource(pathName):
     return sheetData
 
 
-def dataSourceSplit(sheetData):
+def dataSourceSplit(sheetData, project):
     # 把数据分成三部分，FACA表和TraceMissing表
-    OQCStation = sheetData.loc[sheetData[sheetData['漏失目标'] == 0.002].index]   # 获取漏失率为0.2%的行
-    OQCStation = OQCStation[OQCStation['漏失率'] < 0.002]     # 筛选漏失率低于0.2%的行
+    OQCStation = sheetData.loc[sheetData[sheetData['漏失目标'] == 0.002].index]  # 获取漏失率为0.2%的行
+    OQCStation = OQCStation[OQCStation['漏失率'] < 0.002]  # 筛选漏失率低于0.2%的行
     dfList = sheetData.drop(OQCStation.index)  # 去掉漏失率低于0.2%的行
     dfList = dfList.sort_values(by='漏失率', ascending=False)  # Phoenix 按漏失率排序
-    #dfList = dfList.iloc[0:5, ]  # 获取漏失率前5项
+    # dfList = dfList.iloc[0:5, ]  # 获取漏失率前5项
     dfList = dfList[dfList['漏失率'] > 0.001]  # 获取漏失率>0.001的行
 
     dfList.reset_index(drop=True, inplace=True)  # 行号重新排序
@@ -98,12 +96,12 @@ def dataSourceSplit(sheetData):
     traceMissingTable = dfList
     traceMissingTable["fa"] = "待回复"
     traceMissingTable["ca"] = "待回复"
-    traceMissingTable["item_id"] = [project+str(maxId+i+1) for i in range(len(dfList))]
+    traceMissingTable["item_id"] = [project + str(maxId + i + 1) for i in range(len(dfList))]
     traceMissingTableName = ['item_id', '日期', '被卡控站点', '站别', '漏失数量', '漏失率', 'dri', 'fa',
                              'ca']  # , 'returndri', 'returntime']
     traceMissingTable = traceMissingTable.loc[0:, traceMissingTableName]  # 选取特定列
     traceMissingTable.columns = ['item_id', '日期', '被卡控站点', '呈现站点', '漏失数量', '漏失率', 'dri', 'fa',
-                             'ca']
+                                 'ca']
     traceMissingTable.loc[0:, 'returndri'] = '待回复'  # 新增一列
     traceMissingTable = traceMissingTable.fillna(value='待回复')  # 替换NaN值
     traceMissingTable.loc[0:, 'returntime'] = None  # 新增一列
@@ -145,13 +143,13 @@ def insertIntoSql(frames, tableNames):
         if frames[i] is None:
             continue
         frames[i].to_sql(tableNames[i], engine, index=False, if_exists='append', method='multi', index_label=None,
-                 chunksize=None,)
+                         chunksize=None, )
     engine.dispose()
     print('数据写入SQL Server成功')
     print('------------')
 
 
-def getMailData(project):
+def getMailData(project, dateNow, imagePath):
     # pandas.DataFrame(dataFrame).to_excel('C:\ActionTracker\data1.xlsx', sheet_name='summery', index=False, header=True)
     tableColumns = ['日期', '被卡控站点', '呈现站点', '漏失数量', '漏失率', 'FA', 'CA', 'DRI']
     sqlData = f""" SELECT DISTINCT top (30) 
@@ -167,14 +165,14 @@ def getMailData(project):
     mailInfoTable['日期'] = mailInfoTable['日期'].astype(str)  # 强制转换数据类型
     for i in range(len(mailInfoTable.loc[0:, '漏失率'])):
         mailInfoTable.loc[i, '漏失率'] = '{:.2%}'.format(float(mailInfoTable.loc[i, '漏失率']))  # 格式化输出%数据
-        #mailInfoTable.loc[i, '日期'] = mailInfoTable.loc[i, '日期'].strftime('%Y-%m-%d')[0:10]
+        # mailInfoTable.loc[i, '日期'] = mailInfoTable.loc[i, '日期'].strftime('%Y-%m-%d')[0:10]
     print('------------')
     styles = [dict(selector='td', props=[("text-align", "center")]),
               dict(selector="th", props=[("font-size", "15px"), ("text-align", "center")]),
               dict(selector="caption", props=[("caption-side", "top")])]
     mailInfoTable = mailInfoTable.style.set_table_styles(styles).applymap(changeColor,
                                                                           subset=['漏失率']).hide_index().render()
-    mailInfoTable = changeStyle(mailInfoTable, dateNow)
+    mailInfoTable = changeStyle(mailInfoTable, dateNow, imagePath, project)
     return mailInfoTable
 
 
@@ -196,7 +194,7 @@ def conSqlS(sqlData):
     return row
 
 
-def changeStyle(mailInform, dateNow1):
+def changeStyle(mailInform, dateNow1, imagePath, project):
     # 未达标邮件~
     with open(imagePath, "rb") as f:  # 图片转为base64格式
         base64_data = base64.b64encode(f.read())
@@ -256,7 +254,7 @@ def changeStyle(mailInform, dateNow1):
     return mailText
 
 
-def changeStyle2(dateNow1):
+def changeStyle2(dateNow1, project):
     # 达标邮件~
     head = \
         """
@@ -328,7 +326,7 @@ def changeColor(val):
         return 'color:black'
 
 
-def conPlotData(date):  # 链接数据库，查询已处理的时段
+def conPlotData(date, project):  # 链接数据库，查询已处理的时段
     querySql = f"""select top (15)
                         日期,
                         sum(总数) as 总数,
@@ -485,7 +483,7 @@ def createPlot(date, imagePath1):
 
 class SendMail(object):
     def __init__(self, content=None,
-                 image=None, file=None):
+                 image=None, file=None, recv=None, cc_email=None, project=None):
         '''
                :param recv: 收件人，多个要传list ['a@qq.com','b@qq.com]
                :param content: 邮件正文
@@ -493,8 +491,8 @@ class SendMail(object):
                :param file: 附件路径，如果不在当前目录下，要写绝对路径，默认没有附件
         '''
 
-        self.recv = people_email  # 收件人，多个要传list ['a @ qq.com','b @ qq.com]
-        self.cc_email = cc_email  # cc人员
+        # self.recv = people_email  # 收件人，多个要传list ['a @ qq.com','b @ qq.com]
+        # self.cc_email = cc_email  # cc人员
         self.title = f'{project}专案Trace漏失报告'  # 邮件标题
         self.content = content  # 邮件正文
         self.image = image  # 图片路径（绝对路径）
@@ -560,7 +558,7 @@ class SendMail(object):
         return resultCode
 
 
-if __name__ == '__main__':
+def runActionTracker():
     iniPath = os.path.abspath(os.path.dirname(sys.argv[0]))  # 获取当前执行文件夹路径
     iniPath = [iniPath + "/actionTracker.ini", iniPath + "/actionTracker2.ini"]
     for path0 in iniPath:
@@ -599,12 +597,12 @@ if __name__ == '__main__':
             mailTime = mailTime[0:10]
 
             try:
-                dataList = readDataSource(sourcePath)  # 1.从excel读取数据源
+                dataList = readDataSource(sourcePath, dateDays, dateNow, project)  # 1.从excel读取数据源
             except Exception as e:
                 print(e)
                 print("当日数据未更新，请更新数据~")
                 continue
-            dataList = dataSourceSplit(dataList)  # 2.对数据进行分析，拆成两个表
+            dataList = dataSourceSplit(dataList, project)  # 2.对数据进行分析，拆成两个表
             print('TraceMissing数据库数据为-----')
             print(dataList[1])
 
@@ -618,19 +616,47 @@ if __name__ == '__main__':
                     continue
                 insertIntoSql(dataList, SQLTableName)  # 3.数据存入PGSQL
                 mailInfoTable = changeStyle2(dateNow)
-                m = SendMail(content=mailInfoTable)
+                m = SendMail(content=mailInfoTable, recv=people_email, cc_email=cc_email, project=project)
                 m.send_mail()  # 7. 发Trace无漏失邮件
                 continue
 
             createPlot(dateNow, imagePath)  # 从数据库生成图片
-            mailInfo = getMailData(project)  # 6. 从数据库获取邮件信息pd
+            mailInfo = getMailData(project, dateNow, imagePath)  # 6. 从数据库获取邮件信息pd
             # openExcel(outputPath)  # 模拟电脑打开excel
             if isRun & (reMail != '1'):  # 防止重复运行重复存入数据库重复发邮件
                 print('当天邮件已发送~')
                 continue
-            m = SendMail(content=mailInfo)
+            m = SendMail(content=mailInfo, recv=people_email, cc_email=cc_email, project=project)
             m.send_mail()  # 7. 发Trace漏失邮件
         except Exception as e:
             print(e)
             continue
     sys.exit(0)
+
+
+# args = {
+#     'owner': 'airflow',
+#     'start_date': airflow.utils.dates.days_ago(2)
+# }
+
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'start_date': airflow.utils.dates.days_ago(2),
+    'email': ['airflow@example.com'],
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,
+    'retry_delay': datetime.timedelta(minutes=5),
+}
+
+dag = DAG(
+    dag_id='ActionTracker3', default_args=default_args,
+    schedule_interval=None)
+
+run_task = PythonOperator(
+    task_id='runActionTracker',
+    provide_context=True,
+    python_callable=runActionTracker,
+    dag=dag)
+
