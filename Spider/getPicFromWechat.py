@@ -1,3 +1,15 @@
+#!/E:\PythonProjects\pythonProject2 python3.8
+# -*- coding: utf-8 -*-
+# ---
+# @Software: PyCharm
+# @File: getPicFromWechat.py
+# @Author: Jackie Lee
+# @Institution: Wuxi, Jiangsu, China
+# @E-mail: Yuan_li5928@jabil.com
+# @Site: 
+# @Time: 12月 14, 2021
+# ---
+
 import fake_useragent
 import img2pdf
 import requests
@@ -28,8 +40,9 @@ class PictureCatcher:
         print("html---------------------------------------")
         print(html)
         urlList = html.xpath(
-            '//*[@id="xiangyingshi"]/table/tbody/tr[6]/td/table[1]/tbody/tr/td/p[3]/img//img/@data-src')
-        '/html/body/div[1]/div[2]/div[1]/div/div[1]/div[3]//img/@data-src'
+            '//*[@id="js_content"]/section[1]/section/section/section/section[16]/section/section/section/section/section//img/@data-src')
+        # '//*[@id="js_content"]//img/@data-src')  # //*[@id="ssr-content"]/div[2]/div[2]/div[1]/div[1]//@src  //*[
+        # @id="js_content"]/section[5]/section/section/section/p[1]/img[1]
         print("urlList---------------------------------------")
         print(urlList)
         print('地址解析完成')
@@ -69,7 +82,7 @@ def to_pdf(picList):
 if __name__ == '__main__':
     try:
         # url = "https://mp.weixin.qq.com/s/OYP2UKUEQi12VJVEmAP6TA"
-        url = 'http://www.uml.org.cn/xmgl/201908093.asp'
+        url = 'https://mp.weixin.qq.com/s/ZpmjhyayQy8-CVJ1h53MKA'
         path0 = r"D:\PMShare\images"
         path = path0
         for i in range(1000):

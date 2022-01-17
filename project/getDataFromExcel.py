@@ -20,7 +20,7 @@ class ExcelData():
         # 根据工作表的名称获取工作表中的内容（方式①）
         self.table = self.data.sheet_by_name(self.sheetname)
         # 根据工作表的索引获取工作表的内容（方式②）
-        # self.table = self.data.sheet_by_name(0)
+        # self.table = self.data1.sheet_by_name(0)
         # 获取第一行所有内容,如果括号中1就是第二行，这点跟列表索引类似
         self.keys = self.table.row_values(0)
         # 获取工作表的有效行数

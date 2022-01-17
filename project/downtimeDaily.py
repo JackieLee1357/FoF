@@ -16,7 +16,7 @@ def get_record(url):                    #从URL获取Json文件
     return ele_json
 
 def convertToPandas(data):               #字典转为DateFrame
-    data = data["data"]
+    data = data["data1"]
     columns = ['plantname', 'bg','projectname', 'downdate','equipment','machineNo', 'errorcode', 'downtimes', 'maxupdateTime']
     dateframe = pandas.DataFrame(columns=columns)
     print(data[0].keys())

@@ -9,6 +9,9 @@
 # @Site:
 # @Time: 8月 02, 2021
 # ---
+import datetime
+import os
+import sys
 import time
 import pandas
 import configparser
@@ -29,17 +32,22 @@ class Article(Base):
     ca = Column(String(150))
     returndri = Column(String(50))
     returntime = Column(String(50))
+    eventtime = Column(String(50))
 
     def __str__(self):
         return '[%s, %s, %s, %s, %s]' % (self.item_id, self.fa, self.ca, self.returndri, self.returntime)
 
 
 def update_data(updateData):
+    dateNow = (datetime.datetime.now() + datetime.timedelta(days=-1)).strftime("%Y-%m-%d")+" 00:00:00"
+    print(dateNow)
+    print(type(dateNow))
     for i in range(len(updateData)):
-        dataup = {Article.fa: updateData.loc[i, 'FA'], Article.ca: updateData.loc[i, 'CA'],
+        dataup = {Article.fa: updateData.loc[i, 'FA'],
+                  Article.ca: updateData.loc[i, 'CA'],
                   Article.returndri: updateData.loc[i, 'returndri'],
                   Article.returntime: updateData.loc[i, 'returntime']}
-        article = session.query(Article).filter_by(item_id=str(updateData.loc[i, 'item_id'])).update(dataup)
+        article = session.query(Article).filter_by(item_id=str(updateData.loc[i, 'item_id']), eventtime=dateNow).update(dataup)
     session.commit()
     print('数据更新成功')
 
@@ -67,8 +75,10 @@ def getUpdateData(frames):
 
 
 if __name__ == '__main__':
+    path0 = os.path.abspath(os.path.dirname(sys.argv[0]))  # 获取当前执行文件夹路径
+    path0 = path0 + "/actionTracker.ini"
     config = configparser.ConfigParser()
-    config.read('C:\ActionTracker\FACA.ini', encoding="utf-8")  # 导出配置文件
+    config.read(path0, encoding="utf-8")  # 导出配置文件
     outputPath = config.get("messages", "outputPath")       # 处理后文件网址
     SQLTableName = ['actiontracker_faca', 'actiontracker_tracemissing']
     excelData = readExcel(outputPath)

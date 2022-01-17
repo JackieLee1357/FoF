@@ -1,6 +1,12 @@
 import datetime
 import pymssql
 import pandas
+import psycopg2
+import sqlalchemy
+from sqlalchemy import create_engine
+import configparser
+from io import StringIO
+import io
 
 ##从SQL Server获取数据
 def getDataFromSqlS(sql):
@@ -21,84 +27,76 @@ def getDataFromSqlS(sql):
         print(e)
         return None
 
-#去除TotalNum相同的记录
-def duplicated(frame):
-    row = frame.loc[0][1]
-    for i in range(1, len(frame)):
-        if row == frame.loc[i][1]:
-            frame = frame.drop(i)      #删除行
-        else:
-            row = frame.loc[i][1]
-        print(f"{eventDate}数据清洗中")
-        print("===========================")
-    frame.reset_index(drop=True, inplace=True)  #行号重新排序
-    return frame
-
 #按照EMT号分组并计数
 def grouped(fm):
     grouped = fm.groupby(fm[0])  # 按照EMT号分组
-    counted = grouped.agg({1: 'count'})  # 按组计数
+    counted = grouped.agg({2: 'count'})  # 按组计数
     counted["日期"] = eventDate  # 新增一列
     counted = counted.reset_index()  # 索引转换为列
     counted.columns = columns  # 修改列名
     return counted
 
-#数据插入SQL Server
-def insertIntoSqlS(frame):
-    try:
-        conn = pymssql.connect(
-            host='CNWXIM9258N',  # 主机名或ip地址      CNWXIM9258N\SQLEXPRESS     DESKTOP-5IILHSC
-            user='jack',  # 用户名
-            password='1485928',  # 密码
-            port='49968',
-            charset='utf8',  # 字符编码
-            database='Band OEE')  # 库名
-        cursor = conn.cursor()
-        print("链接SQL成功")
-        for i in range(0, len(frame)):
-            emt = frame.iloc[i, 0]
-            output = frame.iloc[i, 1]
-            eventDate = frame.iloc[i, 2]
-            sql = f"INSERT INTO [Band OEE].[dbo].[Output] VALUES({emt}, {output}, {eventDate})"  #CONVERT(varchar(2), {eventTime}, 120)
-            cursor.execute(sql)
-            conn.commit()
-            print(f"{eventDate}数据写入中")
-            print("===========================")
-        cursor.close()
-        conn.close()
-        print("插入SQL成功")
-        return
-    except pymssql.Error as e:
-        print(e)
-        return
-
+def insert_intosql(pagedata):
+    db_url = 'postgresql+psycopg2://OE_User:JGP123456@CNWXIM0WINSVC01:5438/Trace_T1'
+    engine = sqlalchemy.create_engine(db_url)
+    connection = engine.raw_connection()
+    cursor = connection.cursor()
+    output = io.StringIO()
+    pagedata.to_csv(output, sep='\t', index=False, header=False)
+    output1 = output.getvalue()
+    connection = connection
+    cursor = connection.cursor()
+    cursor.copy_from(StringIO(output1), 'BandOEE_output') #, columns=['EMT', 'output', 'eventtime'])
+    cursor.execute('select * from BandOEE_output')
+    row = cursor.fetchall()
+    connection.commit()
+    cursor.close()
+    engine.dispose()
+    print('sql插入完成')
+    return row
 
 if __name__ == '__main__':
-    beganDay = -2           #查询天数
-    endDay = 0
+    config = configparser.ConfigParser()
+    config.read('C:\\BandOEE\\bandoee.ini')  # 导出配置文件
+    beginHour = int(config.get("messages", "beginHour"))  # 查询开始时间：多少小时之前
+    endHour = int(config.get("messages", "endHour"))  # 查询结束时间：多少小时之前
     pd = pandas.DataFrame()
-    for i in range(beganDay*24, endDay*24):
+    for i in range(beginHour, endHour):
         maxTime = i+1
         minTime = i
-        eventDate = str((datetime.datetime.now() + datetime.timedelta(hours=minTime)).strftime(f"%Y%m%d%H0000"))  #
-        #eventDate = str((datetime.datetime.now() + datetime.timedelta(days=beganDay)).strftime(f"%Y%m%d{eventHour}0000"))   #%H:00:00"
-        columns = ['EMT', 'Output', 'EventDate']
-        sql = f"""SELECT TOP (5) [EMT],[TotalNum],[EventTime] 
-        FROM [SMDP].[dbo].[viewSMEAPI_MachineStatusMonth] 
-        WHERE EventTime < CONVERT(varchar(14), DATEADD(HOUR,{maxTime},GETDATE()), 120)+'00:00'     
-        AND EventTime > CONVERT(varchar(14), DATEADD(HOUR,{minTime},GETDATE()), 120)+'00:00'  
-        AND Station LIKE 'WXI_Metal_%' 
-        ORDER BY EMT,EventTime"""
+        eventDate = str((datetime.datetime.now() + datetime.timedelta(hours=minTime)).strftime(f"%Y-%m-%d %H:00:00"))  #
+        columns = ['EMT', 'output', 'eventtime', 'hourIndex', 'CT', 'totalCT']
+        sql = f"""WITH ONE AS(
+SELECT EMT
+       ,DATEDIFF(MINUTE,'{eventDate}',EventTime)/60+1 hourIndex
+	   ,max(TotalNum) maxTotalNum
+	   ,min(TotalNum) minTotalNum
+	   ,COUNT(TotalNum) totalCount
+	   ,avg( CONVERT(decimal(16,2), isnull(ProcessCycleTm,0))) CT
+	   ,SUM(CASE WHEN ProcessCycleTm !='0'then ProcessCycleTm*1.0   ELSE 0 END) sumCT
+	   ,sum(CASE WHEN ProcessCycleTm !='0' THEN 1 ELSE 0 END) countCT
+FROM [SMDP].[dbo].[viewSMEAPI_CNCProductInfoMonth]
+where EventTime<'{eventDate}'
+and EventTime>=DATEADD(HOUR,-1,'{eventDate}') 
+AND Station LIKE 'WXI_Metal_%'
+group by EMT,DATEDIFF(MINUTE,'{eventDate}',EventTime)/60)
+
+SELECT EMT
+       ,CASE WHEN maxTotalNum=0 THEN 0 ELSE CASE WHEN minTotalNum=0 THEN totalCount - 1 ELSE CASE WHEN maxTotalNum = minTotalNum then 1 else maxTotalNum + 1 - minTotalNum end END END AS output
+	   ,'{eventDate}' AS eventtime
+       ,hourIndex
+	   ,CASE WHEN countCT = 0 THEN 0 ELSE Convert(decimal(16,2),1.0*sumCT/countCT) END AS CT
+	   ,sumCT TotalCT
+FROM ONE
+ORDER BY CT DESC"""
+        #print(sql)
         print(f"{eventDate}数据分析中")
         print("----------------------")
-        fm = getDataFromSqlS(sql)
-        fm = duplicated(fm)
-        data = grouped(fm)
-        if i == beganDay*24:
-            pd = data
-        else:
-            pd = pandas.concat([data, pd], axis=0)
-    insertIntoSqlS(pd)
+        data = getDataFromSqlS(sql)
+        #data1 = grouped(fm)
+        pd = pandas.concat([data, pd], axis=0)    #DataFrame 合并
     print(pd)
+    #row = insert_intosql(pd)
+    #print(row)
 
 

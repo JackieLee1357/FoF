@@ -34,7 +34,7 @@ class Ao3:
             #print(res.text)
             root = etree.HTML(res.text)
             picturl_path_list = picturl_path_list + root.xpath('//*[@class="commentlist"]/li/div/div/div[2]/p/a/@href')
-            #print(picturl_path_list)
+            #print(picturePathList)
             jiandan_url = "http:" + root.xpath('//*[@id="comments"]/div[2]/div/a[1]/@href')[0]
             #print("下一页："+jiandan_url)
         return picturl_path_list

@@ -3,6 +3,7 @@
 """根据搜索词下载百度图片"""
 import re
 import os
+import sys
 import time
 import urllib
 import requests
@@ -53,7 +54,8 @@ if __name__ == '__main__':
         if not os.path.exists(basePath):
             os.mkdir(basePath)
     except:
-        basePath = "C:/picture/baiduPicture/"
+        path0 = os.path.abspath(os.path.dirname(sys.argv[0]))  # 获取当前执行文件夹路径
+        basePath = path0 + "/baiduPicture/"
         if not os.path.exists(basePath):
             os.mkdir(basePath)
     keyword = input('请输入搜素关键词：')  # 关键词, 改为你想输入的词即可, 相当于在百度图片里搜索一样

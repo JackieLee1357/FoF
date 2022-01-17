@@ -1,26 +1,41 @@
+#!/E:\PythonProjects\pythonProject2 python3.8
+# -*- coding: utf-8 -*-
+# ---
+# @Software: PyCharm
+# @File: testBar.py
+# @Author: Jackie Lee
+# @Institution: Wuxi, Jiangsu, China
+# @E-mail: Yuan_li5928@jabil.com
+# @Site: 
+# @Time: 8月 16, 2021
+# ---
+
+
+
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
 
-plt.figure(3)
-x_index = np.arange(5)   #柱的索引
-x_data = ('A', 'B', 'C', 'D', 'E')
-y1_data = (20, 35, 30, 35, 27)
-y2_data = (25, 32, 34, 20, 25)
-bar_width = 0.35   #定义一个数字代表每个独立柱的宽度
+#构造数据
+N = 10
+ind = np.arange(N)
+bars = np.random.randn(N)
+t = np.arange(0.01, 10.0, 0.01)
 
-rects1 = plt.bar(x_index, y1_data, width=bar_width,alpha=0.4, color='b',label='legend1')            #参数：左偏移、高度、柱宽、透明度、颜色、图例
-rects2 = plt.bar(x_index + bar_width, y2_data, width=bar_width,alpha=0.5,color='r',label='legend2') #参数：左偏移、高度、柱宽、透明度、颜色、图例
-#关于左偏移，不用关心每根柱的中心不中心，因为只要把刻度线设置在柱的中间就可以了
-plt.xticks(x_index + bar_width/2, x_data)   #x轴刻度线
-plt.legend()    #显示图例
-plt.tight_layout()  #自动控制图像外部边缘，此方法不能够很好的控制图像间的间隔
-plt.show()
+#新建左侧纵坐标画板
+fig, ax1 = plt.subplots()
+#画柱状图
+ax1.bar(ind, bars, alpha=0.3)
+ax1.set_xlabel('$x$')
+#显示左侧纵坐标
+ax1.set_ylabel('bar', color='b')
+[tl.set_color('b') for tl in ax1.get_yticklabels()]
 
-n = 5
-y = [20, 10, 30, 25, 15]
-index = np.arange(n)
-pl = plt.bar(index, y, color='blue', width=0.8, bottom=0,)
-pl2 = plt.bar(index, y, 0.8, color='red', bottom=y)
+#新建右侧纵坐标画板
+ax2 = ax1.twinx()
+#画曲线
+ax2.plot(t, np.sin(0.25*np.pi*t), 'r-')
+#显示右侧纵坐标
+ax2.set_ylabel('sin', color='r')
+[tl.set_color('r') for tl in ax2.get_yticklabels()]
 
 plt.show()

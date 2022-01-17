@@ -14,8 +14,8 @@ from numpy import mat as mat
 from numpy import array as array
 from numpy import unique as unique
 import configparser
-import win32com.client as win32
-import win32com
+# import win32com.client as win32
+# import win32com
 import sqlalchemy.sql.default_comparator
 import time
 
@@ -27,7 +27,8 @@ def find_mn(keys):
     :param keys:密钥
     :return:json
     """
-    url = "http://140.179.43.204:7065/BaseService/MN_BaseExt/GetMN_BaseList?UserInfoID=" + keys
+    # url = "http://140.179.43.204:7065/BaseService/MN_BaseExt/GetMN_BaseList?UserInfoID=" + keys
+    url = "http://140.179.72.45:7065/BaseService/MN_BaseExt/GetMN_BaseList?UserInfoID=" + keys
     payload = {}
     headers = {
         'Authorization': 'LDKJ=5771891D20087C4A111BADC7F9FD9642',
@@ -73,9 +74,12 @@ def waste_history(mn, starttime, endtime):
     """
 
     try:
-        url1 = 'http://140.179.43.204:7065//BusinessService/MN_HisData/GetAllMN_HisData_MN?MN='
+        url1 = "http://140.179.72.45:7065//BusinessService/MN_HisData/GetAllMN_HisData_MN?MN="
+
+        # url1 = 'http://140.179.43.204:7065//BusinessService/MN_HisData/GetAllMN_HisData_MN?MN='
         url = url1 + str(mn) + '&' + 'StartTime=' + str(starttime) + '&' + 'EndTime=' + str(
             endtime) + '&' + 'DataTypeID=2061' + '&' + '&' + 'Rubbish=false' + '&' + 'ValueTypeID=Avg'
+        print(url)
         payload = {}
         files = {}
         headers = {
@@ -102,6 +106,7 @@ def waste_history(mn, starttime, endtime):
         response_array['result'] = response_array.apply(lambda x: function(x.DataValue, x.BZlevelUP), axis=1)
         response_array = mat(response_array)
         response_array = array(response_array)
+        print("链接接口成功")
     except:
 
         response_array = pandas.DataFrame(
@@ -112,6 +117,7 @@ def waste_history(mn, starttime, endtime):
         response_array = response_array.fillna(0)
         response_array = mat(response_array)
         response_array = array(response_array)
+        print("无法链接接口")
     return response_array
 
 
@@ -186,11 +192,11 @@ def change_color(val):
 
 
 def change_style_df(df):
-    '''
+    """
     没在用了
     :param df:
     :return:
-    '''
+    """
     dataFrame = pandas.DataFrame(df, columns=['DataTime', 'ParamName', 'MNName', 'DataValue', 'BZlevelUP', 'result'])
     dataFrame = dataFrame.rename(
         columns={'DataTime': '时间', 'ParamName': '项目', 'MNName': '地点', 'DataValue': '值', 'BZlevelUP': '上限',
@@ -332,28 +338,25 @@ def insert_intosql(pagedata):
 #     mail_item.HTMLBody = waring_html
 #     mail_item.Send()
 
-def sent_emailoutlook(waring_html, time_email, people_email):
+def sentEmailOutlook(waring_html, time_email, people_email):
+    mail_content = ''
     if time_email == starttime:
         mail_content = "JGP无锡废水超标报警"
     elif time_email == excel_time2:
         mail_content = 'JGP无锡污废水实验室报告'
-
     smtpServer = r'CORIMC04'
     commonPort = 587
     smtp = smtplib.SMTP("{}:{}".format(smtpServer, commonPort))
     msg = MIMEText(waring_html, "html", 'utf-8')
-
     msg["Subject"] = Header(mail_content, 'utf-8').encode()
     from_addr = "Facility_Service@jabil.com"
     receivers = people_email
     # receivers=','.join(receivers)
-
-    receivers=list(receivers)
-    msg["To"] =",".join(receivers)
+    receivers = list(receivers)
+    msg["To"] = ",".join(receivers)
     msg["from"] = from_addr
-    smtp.sendmail(from_addr=from_addr,to_addrs=receivers,msg=msg.as_string())
+    smtp.sendmail(from_addr=from_addr, to_addrs=receivers, msg=msg.as_string())
     smtp.quit()
-
 
 
 def read_excel(sheetname, columns, excelname):
@@ -362,9 +365,8 @@ def read_excel(sheetname, columns, excelname):
     :param columns: datetime，指定第sheetname页的 哪一天数据
     :return: 返回datafarme,pandas里面的数据结构
     """
-    excel_data = pandas.read_excel('Z:\\5.Tech Support\\1\\WATER.xlsx', sheet_name=sheetname, keep_default_na=False,
+    excel_data = pandas.read_excel('//Cnwxig0nsifsn01\wxi mes\Metal/5.Tech Support/1/WATER.xlsx', sheet_name=sheetname, keep_default_na=False,
                                    engine="openpyxl", header=0)
-
     excel_data.columns = excel_data.columns.astype(str)
 
     excel_data = pandas.DataFrame(excel_data, columns=columns)
@@ -376,9 +378,8 @@ def read_excel(sheetname, columns, excelname):
     return excel_data
 
 
-def overweight(guest_min, guest_max, time_new, project,timeresult):
+def overweight(guest_min, guest_max, time_new, project, timeresult):
     """
-
     :param guest_min:下限的标准列
     :param guest_max: 上限的标准列
     :param time_new: 日期列
@@ -388,14 +389,13 @@ def overweight(guest_min, guest_max, time_new, project,timeresult):
     if guest_min <= time_new <= guest_max:
         return str('符合标准')
     elif time_new < guest_min:
-        return str(project+'低于标准'+':'+'标准{a}—{b},实测{c}'.format(a=guest_min,b=guest_max,c=timeresult))
+        return str(project + '低于标准' + ':' + '标准{a}—{b},实测{c}'.format(a=guest_min, b=guest_max, c=timeresult))
     else:
-        return str(project + '超过标准'+':''标准{a}—{b},实测{c}'.format(a=guest_min,b=guest_max,c=timeresult))
+        return str(project + '超过标准' + ':''标准{a}—{b},实测{c}'.format(a=guest_min, b=guest_max, c=timeresult))
 
 
 def merge_group(excel_rersult):
     """
-
     :param excel_rersult: datafarme 的结果列
     :return: 结果列，相同地点的且不同超标结果合一
     """
@@ -425,16 +425,13 @@ def change_style_excel(excel_one, time_html):
         <head>
             <meta charset="utf-8">
             <STYLE TYPE="text/css" MEDIA=screen>
-
                 table
             {
              border-collapse:collapse;
-
             }
             table, td,tr,th
             {
              border:1px solid black;
-
              padding: 15px
              }
             </STYLE>
@@ -445,23 +442,17 @@ def change_style_excel(excel_one, time_html):
         """
        <body>
 
-        <div align="left",font-family='SimSun',"font-size"="15px">
-           <p>Dear Leaders:</p>
-           <p>以下为污废水实验室日常报告,请查阅！</p>
-           <p>日期：{sh_sys}</p>
-           <p>{dataFrame}</p>
-           <p>现场管理:徐虎 18661001021 周思翰 18961885579</p>
-           <br/>  
-           <a href="http://cnwgpm0pbi01/Reports/powerbi/WX_MetalSME/official/JGP%E5%BA%9F%E6%B0%B4%E7%9B%91%E6%B5%8B%E6%8A%A5%E5%91%8A"target="_blank">更多废水数据请查阅PowerBi</a>
-           <p>自动邮件,请勿答复</p>    
-        </div>
-
+        <div align="left",font-family='SimSun',"font-size"="15px"> <p>Dear Leaders:</p> <p>以下为污废水实验室日常报告,
+        请查阅！</p> <p>日期：{sh_sys}</p> <p>{dataFrame}</p> <p>现场管理:徐虎 18661001021 周思翰 18961885579</p> <br/> <a 
+        href="http://cnwgpm0pbi01/Reports/powerbi/WX_MetalSME/official/JGP%E5%BA%9F%E6%B0%B4%E7%9B%91%E6%B5%8B%E6%8A
+        %A5%E5%91%8A"target="_blank">更多废水数据请查阅PowerBi</a> <p>自动邮件,请勿答复</p> </div> 
+        
     </body>
     """.format(dataFrame=excel_one, html_time=time_html, sh_sys=str(excel_time)[0:10])
-    dataFrame = "<html>" + head + body + "</html>"
-    dataFrame=dataFrame.replace('&&&','<br>')
+    dataFrame1 = "<html>" + head + body + "</html>"
+    dataFrame1 = dataFrame1.replace('&&&', '<br>')
 
-    return dataFrame
+    return dataFrame1
 
 
 if __name__ == '__main__':
@@ -480,8 +471,10 @@ if __name__ == '__main__':
 
         fort = []
         MN = list(find_mn(keys))  # 导出mn
+        print(MN)
         for o in MN:
             fort.extend(waste_history(o, starttime, endtime))  # 遍历mn,导出mn相关数据
+        print(fort)
         fort = pandas.DataFrame.from_records(fort,
                                              columns=['DataTime', 'DataTypeID', 'DataValue', 'LHCodeID', 'ValueTypeID',
                                                       'BZlevelDown', 'BZlevelUP', 'MN', 'MNName', 'ParamName',
@@ -493,7 +486,6 @@ if __name__ == '__main__':
         # #后续会来两天发送一个的那种邮件.再做第三个style
 
         fort_yes = fort[(fort['result'] == 'YES') & (fort['BZlevelUP'] != float(0)) & (fort['ValueTypeID'] == 'Avg')]
-
         ll = list(fort_yes['result'])
         print(ll)
         people_email = config.get("messages", "people_email")
@@ -502,16 +494,14 @@ if __name__ == '__main__':
         if 'YES' in ll:
             pandas.set_option('display.max_columns', None)
             pandas.set_option('display.max_rows', None)
-
             html_waring = change_style(fort_yes)
-
-            send_waring = sent_emailoutlook(waring_html=html_waring, people_email=people_email, time_email=starttime)
+            sentEmailOutlook(waring_html=html_waring, people_email=people_email, time_email=starttime)
             print('发送成功')
 
         # 判断是否为定点时间，定点时间发送半天数据.
         dataFrame = []
-        if str(starttime)[11:19] in str(totalTime) and str(starttime)[11:19]==1008611:
-            #设置卡控，此下的定时发送一天数据的邮件和逻辑暂时弃用
+        if str(starttime)[11:19] in str(totalTime) and str(starttime)[11:19] == 1008611:
+            # 设置卡控，此下的定时发送一天数据的邮件和逻辑暂时弃用
             print('定点时间')
             for o in MN:
                 dataFrame.extend(waste_history(o, endtime_oftotal, starttime))
@@ -524,8 +514,7 @@ if __name__ == '__main__':
             dataFrame_df = dataFrame[(dataFrame['BZlevelUP'] != float(0)) & (dataFrame['ValueTypeID'] == 'Avg')]
 
             html_df = change_style_df(dataFrame_df)
-
-            send_df = sent_emailoutlook(waring_html=html_df, people_email=people_email, time_email=endtime_oftotal)
+            sentEmailOutlook(waring_html=html_df, people_email=people_email, time_email=endtime_oftotal)
 
         # 确立发送实验室一日数据的触发逻辑,excel_time 配置文件的时间，也用与摄取表格中的对应列。excel_time_2,定时时间，一般为8点。
         excel_time = config.get('messages', 'excel_time')
@@ -554,36 +543,34 @@ if __name__ == '__main__':
                 data_excel['result'] = data_excel[['客户标准(min)', '客户标准(max)', '项目', excel_time]].apply(lambda x:
                                                                                                       overweight(
                                                                                                           guest_min=x[
-                                                                                                              '客户标准(min)'],
+                                                                                                              '客户标准('
+                                                                                                              'min)'],
                                                                                                           guest_max=x[
-                                                                                                              '客户标准(max)'],
+                                                                                                              '客户标准('
+                                                                                                              'max)'],
                                                                                                           time_new=x[
                                                                                                               excel_time],
                                                                                                           project=x[
-                                                                                                              '项目'],timeresult=x['{a}'.format(a=excel_time)]),
+                                                                                                              '项目'],
+                                                                                                          timeresult=x[
+                                                                                                              '{a}'.format(
+                                                                                                                  a=excel_time)]),
                                                                                                       axis=1)
                 # lambda 内置函数,调用函数overweight，输入需要的三列，得出结果列
-
                 # data_excel_true 调取data_excel中的处理系统和结果，后面去重和修改样式，得出当天超标的数据详情,数据归一
-
                 data_excel_true = pandas.DataFrame.from_records(data_excel, columns=['处理系统', 'result'])
                 # 只保留where和结果
-
                 data_excel_true = data_excel_true.drop_duplicates()
                 data_excel_true = data_excel_true.reset_index()
-
                 data_excel_true = data_excel_true.groupby(['处理系统'], as_index=False).apply(
                     lambda x: merge_group(excel_rersult=x['result']))
                 # 对数据进行归一
                 data_excel_true.columns = ['处理系统', '数据分析结果']
-
                 note_excel_true = pandas.DataFrame.from_records(note_excel, columns=['处理系统', excel_time])
                 note_excel_true.columns = ['处理系统', '实验室备注']
-
                 excel_end = pandas.merge(data_excel_true, note_excel_true, on='处理系统')
 
                 # excel_end 当天结果,合并后改成html格式
-
                 # people_email = config.get("messages", "people_email")
                 # split(',')
 
@@ -596,7 +583,7 @@ if __name__ == '__main__':
                     set_table_styles(styles).applymap(change_color_excel). \
                     hide_index().render()
                 excel_end = change_style_excel(excel_one=excel_end, time_html=html_excel_time)
-                sent_emailoutlook(waring_html=excel_end, people_email=people_email, time_email=excel_time2)
+                sentEmailOutlook(waring_html=excel_end, people_email=people_email, time_email=excel_time2)
                 time_end = datetime.datetime.strptime(config.get("messages", "excel_time"), '%Y-%m-%d %H:%M:%S')
                 time_end = time_end_next = time_end + datetime.timedelta(days=+1)
                 config.set("messages", "excel_time", str(time_end))
@@ -611,8 +598,8 @@ if __name__ == '__main__':
         config.set("messages", "endtime", str(last_time))
         config.write(open('c:\\water\\water.ini', "r+", encoding="utf-8"))
         print('时间已更新,运行下次')
-    except:
-        print('异常')
+    except Exception as e:
+        print(f'异常:{e}')
         config = configparser.ConfigParser()
         config.read('C:\\water\\water.ini')  # 导出配置文件
         starttime = config.get("messages", "starttime")
@@ -630,10 +617,3 @@ if __name__ == '__main__':
         config.set("messages", "starttime", str(last_time))
         config.set("messages", "endtime", str(last_time))
         config.write(open('c:\\water\\water.ini', "r+", encoding="utf-8"))
-
-
-
-
-
-
-

@@ -16,7 +16,7 @@ def get_record(url):                    #从URL获取Json文件
     return ele_json
 
 def convertToPandas(data):               #字典转为DateFrame
-    data = data['data']
+    data = data['data1']
     columns = ["product_date", "machineno", "project", "line", "station", "emt", "oeevalue"]
     dateframe = pandas.DataFrame(columns=columns)
     for i in range(len(data)):
@@ -83,4 +83,3 @@ if __name__ == '__main__':
         frameData = convertToPandas(jsonData)
         insert_intosql(frameData, tableName)
         date = (datetime.datetime.strptime(date, "%Y-%m-%d")+datetime.timedelta(days=-1)).strftime("%Y-%m-%d")[:10]
-    time.sleep(5)  # 暂停5秒
