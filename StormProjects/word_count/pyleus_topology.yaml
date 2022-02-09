@@ -1,0 +1,50 @@
+# This is a very meaningful paragraph
+# describing my_first_topology
+
+#name: my_first_topology
+#
+#workers: 2
+#
+#topology:
+#
+#    - spout:
+#        name: my-first-spout
+#        module: my_first_topology.dummy_spout
+#
+#    - bolt:
+#        name: my-first-bolt
+#        module: my_first_topology.dummy_bolt
+#        groupings:
+#            - shuffle_grouping: my-first-spout
+
+
+name: word_count
+
+topology:
+
+    - spout:
+        name: line-spout
+        module: word_count.line_spout
+
+    - bolt:
+        name: split-words
+        module: word_count.split_words
+        parallelism_hint: 3
+        groupings:
+            - shuffle_grouping: line-spout
+
+    - bolt:
+        name: count-words
+        module: word_count.count_words
+        parallelism_hint: 3
+        groupings:
+            - fields_grouping:
+                component: split-words
+                fields:
+                    - word
+
+    - bolt:
+        name: log-results
+        module: word_count.log_results
+        groupings:
+            - global_grouping: count-words
